@@ -1,0 +1,2023 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Indian Postal Department Field Operations API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication
+  - name: offices
+    description: Post office management
+  - name: users
+    description: User management
+  - name: beats
+    description: Beat management
+  - name: articles
+    description: Postal article management
+  - name: visits
+    description: Field visit management
+  - name: addresses
+    description: Address database
+  - name: location
+    description: Live location tracking
+  - name: dashboard
+    description: Dashboard summaries
+  - name: reports
+    description: Reports
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ── Auth ──────────────────────────────────────────────────────────
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login for all user roles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenRefreshInput"
+      responses:
+        "200":
+          description: New tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout and invalidate tokens
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ── Offices ───────────────────────────────────────────────────────
+  /offices:
+    get:
+      operationId: listOffices
+      tags: [offices]
+      summary: List all post offices
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of offices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Office"
+    post:
+      operationId: createOffice
+      tags: [offices]
+      summary: Create a new post office (super admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOfficeRequest"
+      responses:
+        "201":
+          description: Office created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Office"
+
+  /offices/{id}:
+    get:
+      operationId: getOffice
+      tags: [offices]
+      summary: Get a specific office
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Office details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Office"
+    put:
+      operationId: updateOffice
+      tags: [offices]
+      summary: Update office details or polygon
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOfficeRequest"
+      responses:
+        "200":
+          description: Updated office
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Office"
+
+  /offices/{id}/status:
+    patch:
+      operationId: setOfficeStatus
+      tags: [offices]
+      summary: Activate or deactivate an office
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusUpdate"
+      responses:
+        "200":
+          description: Updated office
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Office"
+
+  # ── Users ─────────────────────────────────────────────────────────
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users (filtered by role if provided)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role
+          in: query
+          schema:
+            $ref: "#/components/schemas/UserRole"
+        - name: officeId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user (admin or operator)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user details
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user details
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}/offices:
+    post:
+      operationId: assignOfficesToUser
+      tags: [users]
+      summary: Assign offices to an admin user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OfficeAssignment"
+      responses:
+        "200":
+          description: Offices assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}/status:
+    patch:
+      operationId: setUserStatus
+      tags: [users]
+      summary: Activate or deactivate a user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusUpdate"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ── Beats ─────────────────────────────────────────────────────────
+  /beats:
+    get:
+      operationId: listBeats
+      tags: [beats]
+      summary: List beats for an office
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: officeId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Beat list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Beat"
+    post:
+      operationId: createBeat
+      tags: [beats]
+      summary: Create a new beat with polygon
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBeatRequest"
+      responses:
+        "201":
+          description: Beat created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beat"
+
+  /beats/{id}:
+    get:
+      operationId: getBeat
+      tags: [beats]
+      summary: Get beat details with polygon and addresses
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Beat details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beat"
+    put:
+      operationId: updateBeat
+      tags: [beats]
+      summary: Update beat details or polygon
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBeatRequest"
+      responses:
+        "200":
+          description: Updated beat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beat"
+
+  /beats/{id}/assign:
+    post:
+      operationId: assignBeat
+      tags: [beats]
+      summary: Assign a beat to a field operator
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeatAssignment"
+      responses:
+        "200":
+          description: Beat assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beat"
+
+  # ── Articles ──────────────────────────────────────────────────────
+  /articles:
+    get:
+      operationId: listArticles
+      tags: [articles]
+      summary: List postal articles
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: officeId
+          in: query
+          schema:
+            type: string
+        - name: operatorId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ArticleStatus"
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Article list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Article"
+    post:
+      operationId: createArticle
+      tags: [articles]
+      summary: Issue a postal article to an operator
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateArticleRequest"
+      responses:
+        "201":
+          description: Article issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Article"
+
+  /articles/{id}:
+    get:
+      operationId: getArticle
+      tags: [articles]
+      summary: Get article by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Article details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Article"
+    put:
+      operationId: updateArticle
+      tags: [articles]
+      summary: Update article delivery status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateArticleRequest"
+      responses:
+        "200":
+          description: Updated article
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Article"
+
+  /articles/scan/{barcode}:
+    get:
+      operationId: scanArticle
+      tags: [articles]
+      summary: Look up article by barcode
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: barcode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Article found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Article"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Visits ────────────────────────────────────────────────────────
+  /visits:
+    get:
+      operationId: listVisits
+      tags: [visits]
+      summary: List field visits
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: operatorId
+          in: query
+          schema:
+            type: string
+        - name: officeId
+          in: query
+          schema:
+            type: string
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: isSynced
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Visit list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Visit"
+    post:
+      operationId: createVisit
+      tags: [visits]
+      summary: Create a field visit record
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVisitRequest"
+      responses:
+        "201":
+          description: Visit recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Visit"
+
+  /visits/{id}:
+    put:
+      operationId: updateVisit
+      tags: [visits]
+      summary: Update a visit record
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVisitRequest"
+      responses:
+        "200":
+          description: Updated visit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Visit"
+
+  /visits/{id}/photos:
+    post:
+      operationId: uploadVisitPhoto
+      tags: [visits]
+      summary: Attach a photo as evidence for a visit
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
+                gpsLat:
+                  type: number
+                gpsLng:
+                  type: number
+                capturedAt:
+                  type: string
+                  format: date-time
+              required: [photo, capturedAt]
+      responses:
+        "201":
+          description: Photo attached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisitPhoto"
+
+  /visits/{id}/sign-delivery:
+    post:
+      operationId: signVisitDelivery
+      tags: [visits]
+      summary: Capture a govt-service-backed delivery signature (simulated)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                method:
+                  type: string
+                  enum: [digilocker, aadhaar_esign]
+              required: [method]
+      responses:
+        "200":
+          description: Visit updated with the delivery signature
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Visit"
+
+  # ── Addresses ─────────────────────────────────────────────────────
+  /addresses:
+    get:
+      operationId: listAddresses
+      tags: [addresses]
+      summary: Search addresses (offline-cacheable)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: beatId
+          in: query
+          schema:
+            type: string
+        - name: officeId
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search query — matches name, full address, unique code, or digipin
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/AddressType"
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Opaque pagination cursor from a previous response's nextCursor
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+      responses:
+        "200":
+          description: Alphabetically sorted, paginated address list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressListResponse"
+    post:
+      operationId: createAddress
+      tags: [addresses]
+      summary: Add a new address
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAddressRequest"
+      responses:
+        "201":
+          description: Address created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+
+  /addresses/{id}:
+    get:
+      operationId: getAddress
+      tags: [addresses]
+      summary: Fetch a single address by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The address
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+    put:
+      operationId: updateAddress
+      tags: [addresses]
+      summary: Update address details
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAddressRequest"
+      responses:
+        "200":
+          description: Updated address
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+
+  /addresses/{id}/possible-duplicates:
+    get:
+      operationId: getAddressPossibleDuplicates
+      tags: [addresses]
+      summary: Find other addresses matching this one's verified identity (same person, different location)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Addresses sharing the same verified identity, excluding this one. Empty until this address is DigiLocker-verified.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Address"
+
+  /addresses/{id}/verify-digilocker:
+    post:
+      operationId: verifyAddressDigilocker
+      tags: [addresses]
+      summary: Simulate a DigiLocker identity verification for this address
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Address updated with verified DigiLocker credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+
+  /addresses/{id}/verify:
+    post:
+      operationId: verifyAddress
+      tags: [addresses]
+      summary: Admin verification of the address entry itself (not the resident's identity)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [verified, rejected]
+              required: [status]
+      responses:
+        "200":
+          description: Address verification status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+
+  /addresses/{id}/photo:
+    post:
+      operationId: uploadAddressPhoto
+      tags: [addresses]
+      summary: Upload or replace the address's reference photo
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
+              required: [photo]
+      responses:
+        "200":
+          description: Address updated with the reference photo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+
+  # ── Location ──────────────────────────────────────────────────────
+  /location:
+    post:
+      operationId: updateLocation
+      tags: [location]
+      summary: Report operator current location
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLocationRequest"
+      responses:
+        "200":
+          description: Location recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /location/operators:
+    get:
+      operationId: listOperatorLocations
+      tags: [location]
+      summary: Get live locations of all operators (admin view)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: officeId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Operator locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OperatorLocation"
+
+  # ── Dashboard ─────────────────────────────────────────────────────
+  /dashboard/admin:
+    get:
+      operationId: getAdminDashboard
+      tags: [dashboard]
+      summary: Office admin dashboard summary
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: officeId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboard"
+
+  /dashboard/operator:
+    get:
+      operationId: getOperatorDashboard
+      tags: [dashboard]
+      summary: Field operator daily dashboard
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Operator dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperatorDashboard"
+
+  # ── Reports ───────────────────────────────────────────────────────
+  /reports/daily:
+    get:
+      operationId: getDailyReport
+      tags: [reports]
+      summary: Daily operations report
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: officeId
+          in: query
+          schema:
+            type: string
+        - name: operatorId
+          in: query
+          schema:
+            type: string
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Daily report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyReport"
+
+  /reports/summary:
+    get:
+      operationId: getSummaryReport
+      tags: [reports]
+      summary: Aggregated summary report (weekly/monthly/annual)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: officeId
+          in: query
+          schema:
+            type: string
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [week, month, year]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Summary report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SummaryReport"
+
+  /reports/operators:
+    get:
+      operationId: getOperatorProductivityReport
+      tags: [reports]
+      summary: Operator productivity report
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: officeId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Productivity metrics per operator
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OperatorProductivity"
+
+# ── Components ────────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error, message]
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required: [success]
+
+    UserRole:
+      type: string
+      enum: [super_admin, office_admin, field_operator]
+
+    ArticleStatus:
+      type: string
+      enum: [pending, delivered, attempted, returned]
+
+    VisitType:
+      type: string
+      enum: [delivery, enquiry, lead, complaint, pickup, business_proposal, beat_update, office_work, verification, money_collection, other]
+
+    AddressType:
+      type: string
+      enum: [residential, business, government, school, hospital, commercial, social, landmark]
+
+    # ── Auth ──────────────────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required: [username, password]
+
+    TokenRefreshInput:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+      required: [refreshToken]
+
+    AuthTokens:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required: [accessToken, refreshToken, user]
+
+    StatusUpdate:
+      type: object
+      properties:
+        isActive:
+          type: boolean
+      required: [isActive]
+
+    OfficeAssignment:
+      type: object
+      properties:
+        officeIds:
+          type: array
+          items:
+            type: string
+      required: [officeIds]
+
+    BeatAssignment:
+      type: object
+      properties:
+        operatorId:
+          type: string
+      required: [operatorId]
+
+    # ── User ──────────────────────────────────────────────────────────
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        fullName:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        phone:
+          type: string
+          nullable: true
+        employeeId:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        officeIds:
+          type: array
+          items:
+            type: string
+        beatId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, username, fullName, role, isActive, officeIds, createdAt]
+
+    CreateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        fullName:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        phone:
+          type: string
+        employeeId:
+          type: string
+        officeIds:
+          type: array
+          items:
+            type: string
+      required: [username, password, fullName, role]
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+        phone:
+          type: string
+        employeeId:
+          type: string
+        password:
+          type: string
+        officeIds:
+          type: array
+          items:
+            type: string
+
+    # ── Office ────────────────────────────────────────────────────────
+    Office:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        address:
+          type: string
+        district:
+          type: string
+        state:
+          type: string
+        pincode:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        polygonGeoJson:
+          type: object
+          nullable: true
+          description: GeoJSON polygon of office boundary
+        isActive:
+          type: boolean
+        operatorCount:
+          type: integer
+        beatCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, code, address, district, state, pincode, isActive, operatorCount, beatCount, createdAt]
+
+    CreateOfficeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        address:
+          type: string
+        district:
+          type: string
+        state:
+          type: string
+        pincode:
+          type: string
+        phone:
+          type: string
+        polygonGeoJson:
+          type: object
+      required: [name, code, address, district, state, pincode]
+
+    UpdateOfficeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        district:
+          type: string
+        state:
+          type: string
+        pincode:
+          type: string
+        phone:
+          type: string
+        polygonGeoJson:
+          type: object
+
+    # ── Beat ──────────────────────────────────────────────────────────
+    Beat:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        officeId:
+          type: string
+        operatorId:
+          type: string
+          nullable: true
+        operatorName:
+          type: string
+          nullable: true
+        polygonGeoJson:
+          type: object
+          nullable: true
+        addressCount:
+          type: integer
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, officeId, isActive, addressCount, createdAt]
+
+    CreateBeatRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        officeId:
+          type: string
+        polygonGeoJson:
+          type: object
+        operatorId:
+          type: string
+      required: [name, officeId]
+
+    UpdateBeatRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        polygonGeoJson:
+          type: object
+        operatorId:
+          type: string
+
+    # ── Article ───────────────────────────────────────────────────────
+    Article:
+      type: object
+      properties:
+        id:
+          type: string
+        barcode:
+          type: string
+        articleNumber:
+          type: string
+        addressee:
+          type: string
+        deliveryAddress:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ArticleStatus"
+        deliveryReason:
+          type: string
+          nullable: true
+        operatorId:
+          type: string
+          nullable: true
+        officeId:
+          type: string
+        gpsLat:
+          type: number
+          nullable: true
+        gpsLng:
+          type: number
+          nullable: true
+        deliveredAt:
+          type: string
+          format: date-time
+          nullable: true
+        issuedAt:
+          type: string
+          format: date-time
+        requiresSignature:
+          type: boolean
+        requiresPhoto:
+          type: boolean
+        isCod:
+          type: boolean
+        codAmount:
+          type: number
+          nullable: true
+      required: [id, barcode, articleNumber, addressee, deliveryAddress, status, officeId, issuedAt, requiresSignature, requiresPhoto, isCod]
+
+    CreateArticleRequest:
+      type: object
+      properties:
+        barcode:
+          type: string
+        articleNumber:
+          type: string
+        addressee:
+          type: string
+        deliveryAddress:
+          type: string
+        phone:
+          type: string
+        operatorId:
+          type: string
+        officeId:
+          type: string
+        requiresSignature:
+          type: boolean
+        requiresPhoto:
+          type: boolean
+        isCod:
+          type: boolean
+        codAmount:
+          type: number
+      required: [barcode, articleNumber, addressee, deliveryAddress, officeId]
+
+    UpdateArticleRequest:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/ArticleStatus"
+        deliveryReason:
+          type: string
+        gpsLat:
+          type: number
+        gpsLng:
+          type: number
+        operatorId:
+          type: string
+
+    # ── Visit ─────────────────────────────────────────────────────────
+    Visit:
+      type: object
+      properties:
+        id:
+          type: string
+        operatorId:
+          type: string
+        officeId:
+          type: string
+        beatId:
+          type: string
+          nullable: true
+        addressId:
+          type: string
+          nullable: true
+        visitType:
+          $ref: "#/components/schemas/VisitType"
+        gpsLat:
+          type: number
+        gpsLng:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          nullable: true
+        contactNumber:
+          type: string
+          nullable: true
+        verificationMethod:
+          type: string
+          nullable: true
+          description: How the delivery signature was captured — "digilocker", "aadhaar_esign", or null if unsigned
+        verifiedRecipientName:
+          type: string
+          nullable: true
+        verifiedRecipientMobile:
+          type: string
+          nullable: true
+        verifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        isSynced:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, operatorId, officeId, visitType, gpsLat, gpsLng, timestamp, isSynced, createdAt]
+
+    CreateVisitRequest:
+      type: object
+      properties:
+        beatId:
+          type: string
+        addressId:
+          type: string
+        visitType:
+          $ref: "#/components/schemas/VisitType"
+        gpsLat:
+          type: number
+        gpsLng:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+        notes:
+          type: string
+        contactNumber:
+          type: string
+      required: [visitType, gpsLat, gpsLng, timestamp]
+
+    UpdateVisitRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+        isSynced:
+          type: boolean
+
+    VisitPhoto:
+      type: object
+      properties:
+        id:
+          type: string
+        visitId:
+          type: string
+        photoUrl:
+          type: string
+        gpsLat:
+          type: number
+          nullable: true
+        gpsLng:
+          type: number
+          nullable: true
+        digipin:
+          type: string
+          nullable: true
+        capturedAt:
+          type: string
+          format: date-time
+        isSynced:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, visitId, photoUrl, capturedAt, isSynced, createdAt]
+
+    # ── Address ───────────────────────────────────────────────────────
+    Address:
+      type: object
+      properties:
+        id:
+          type: string
+        uniqueCode:
+          type: string
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/AddressType"
+        gpsLat:
+          type: number
+        gpsLng:
+          type: number
+        fullAddress:
+          type: string
+        contactPerson:
+          type: string
+          nullable: true
+        contactNumber:
+          type: string
+          nullable: true
+        accessHours:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        beatId:
+          type: string
+          nullable: true
+        officeId:
+          type: string
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        digipin:
+          type: string
+          nullable: true
+          description: 10-character India Post DIGIPIN geocode, no separators
+        digilockerVerified:
+          type: boolean
+        digilockerVerifiedName:
+          type: string
+          nullable: true
+        digilockerVerifiedMobile:
+          type: string
+          nullable: true
+        digilockerVerifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        verificationStatus:
+          type: string
+          enum: [pending, verified, rejected]
+        verifiedBy:
+          type: string
+          nullable: true
+        verifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        referencePhotoUrl:
+          type: string
+          nullable: true
+      required: [id, uniqueCode, name, type, gpsLat, gpsLng, fullAddress, officeId, createdBy, createdAt, updatedAt, digilockerVerified, verificationStatus]
+
+    AddressListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Address"
+        nextCursor:
+          type: string
+          nullable: true
+          description: Pass as the cursor param to fetch the next page; null means this is the last page
+      required: [items, nextCursor]
+
+    CreateAddressRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/AddressType"
+        gpsLat:
+          type: number
+        gpsLng:
+          type: number
+        fullAddress:
+          type: string
+        contactPerson:
+          type: string
+        contactNumber:
+          type: string
+        accessHours:
+          type: string
+        notes:
+          type: string
+        beatId:
+          type: string
+        officeId:
+          type: string
+      required: [name, type, gpsLat, gpsLng, fullAddress, officeId]
+
+    UpdateAddressRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/AddressType"
+        gpsLat:
+          type: number
+        gpsLng:
+          type: number
+        fullAddress:
+          type: string
+        contactPerson:
+          type: string
+        contactNumber:
+          type: string
+        accessHours:
+          type: string
+        notes:
+          type: string
+
+    # ── Location ──────────────────────────────────────────────────────
+    UpdateLocationRequest:
+      type: object
+      properties:
+        gpsLat:
+          type: number
+        gpsLng:
+          type: number
+        batteryLevel:
+          type: integer
+          minimum: 0
+          maximum: 100
+        isOnline:
+          type: boolean
+      required: [gpsLat, gpsLng]
+
+    OperatorLocation:
+      type: object
+      properties:
+        operatorId:
+          type: string
+        operatorName:
+          type: string
+        gpsLat:
+          type: number
+        gpsLng:
+          type: number
+        batteryLevel:
+          type: integer
+          nullable: true
+        isOnline:
+          type: boolean
+        lastSeen:
+          type: string
+          format: date-time
+      required: [operatorId, operatorName, gpsLat, gpsLng, isOnline, lastSeen]
+
+    # ── Dashboards ────────────────────────────────────────────────────
+    AdminDashboard:
+      type: object
+      properties:
+        officeId:
+          type: string
+        officeName:
+          type: string
+        date:
+          type: string
+          format: date
+        totalOperators:
+          type: integer
+        activeOperators:
+          type: integer
+        totalArticles:
+          type: integer
+        deliveredArticles:
+          type: integer
+        pendingArticles:
+          type: integer
+        attemptedArticles:
+          type: integer
+        returnedArticles:
+          type: integer
+        totalVisits:
+          type: integer
+        totalBeats:
+          type: integer
+        dailyTrend:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyTrendPoint"
+        operatorSummaries:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperatorSummary"
+      required: [officeId, officeName, date, totalOperators, activeOperators, totalArticles, deliveredArticles, pendingArticles, attemptedArticles, returnedArticles, totalVisits, totalBeats, dailyTrend, operatorSummaries]
+
+    OperatorDashboard:
+      type: object
+      properties:
+        operatorId:
+          type: string
+        operatorName:
+          type: string
+        date:
+          type: string
+          format: date
+        pendingArticles:
+          type: integer
+        deliveredToday:
+          type: integer
+        visitsToday:
+          type: integer
+        pendingSync:
+          type: integer
+        beatId:
+          type: string
+          nullable: true
+        beatName:
+          type: string
+          nullable: true
+        articles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Article"
+      required: [operatorId, operatorName, date, pendingArticles, deliveredToday, visitsToday, pendingSync, articles]
+
+    DailyTrendPoint:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        delivered:
+          type: integer
+        visits:
+          type: integer
+      required: [date, delivered, visits]
+
+    OperatorSummary:
+      type: object
+      properties:
+        operatorId:
+          type: string
+        operatorName:
+          type: string
+        delivered:
+          type: integer
+        pending:
+          type: integer
+        visits:
+          type: integer
+        isOnline:
+          type: boolean
+      required: [operatorId, operatorName, delivered, pending, visits, isOnline]
+
+    # ── Reports ───────────────────────────────────────────────────────
+    DailyReport:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        officeId:
+          type: string
+        operatorId:
+          type: string
+          nullable: true
+        totalVisits:
+          type: integer
+        totalArticles:
+          type: integer
+        delivered:
+          type: integer
+        attempted:
+          type: integer
+        returned:
+          type: integer
+        visitsByType:
+          type: object
+          additionalProperties:
+            type: integer
+        gpsRoute:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+      required: [date, officeId, totalVisits, totalArticles, delivered, attempted, returned, visitsByType, gpsRoute]
+
+    SummaryReport:
+      type: object
+      properties:
+        period:
+          type: string
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        officeId:
+          type: string
+        totalVisits:
+          type: integer
+        totalArticles:
+          type: integer
+        deliveryRate:
+          type: number
+        topOperators:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperatorProductivity"
+        dailyBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyTrendPoint"
+      required: [period, from, to, officeId, totalVisits, totalArticles, deliveryRate, topOperators, dailyBreakdown]
+
+    OperatorProductivity:
+      type: object
+      properties:
+        operatorId:
+          type: string
+        operatorName:
+          type: string
+        totalVisits:
+          type: integer
+        totalDeliveries:
+          type: integer
+        deliveryRate:
+          type: number
+        avgDailyVisits:
+          type: number
+      required: [operatorId, operatorName, totalVisits, totalDeliveries, deliveryRate, avgDailyVisits]
