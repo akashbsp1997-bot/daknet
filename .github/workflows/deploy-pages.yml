@@ -1,0 +1,71 @@
+name: Deploy to GitHub Pages
+
+# Deploys the FRONTENDS only — postman and postbook. postman-api (the
+# Express backend) cannot run on GitHub Pages; it stays on Render. Both
+# builds below point at that same backend via VITE_API_URL.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # No pnpm-lock.yaml is committed, so this is a fresh resolve each run,
+      # not a locked install. Fine for now; commit a lockfile later if
+      # reproducible installs start to matter.
+      - run: pnpm install
+
+      - name: Build postman
+        run: pnpm --filter @workspace/postman run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/postman/
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+
+      - name: Build postbook
+        run: pnpm --filter @workspace/postbook run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/postbook/
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+
+      - name: Assemble Pages site
+        run: |
+          mkdir -p site
+          cp -r apps/postman/dist/public site/postman
+          cp -r apps/postbook/dist/public site/postbook
+          cp .github/pages-index.html site/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
