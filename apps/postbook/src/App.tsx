@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, Router as WouterRouter, Redirect } from 'wouter';
+import { Route, Switch, Router as WouterRouter } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
 import { initApi } from './lib/api';
+import { getRole } from '@/lib/auth';
 
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { Shell } from './components/layout/Shell';
@@ -34,7 +35,13 @@ function Router() {
       </Route>
 
       <Route path="/">
-        <Redirect to="/addresses" />
+        {getRole() ? (
+          <ProtectedRoute>
+            <Shell><AddressList /></Shell>
+          </ProtectedRoute>
+        ) : (
+          <Login />
+        )}
       </Route>
 
       <Route component={NotFound} />
