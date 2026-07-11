@@ -1,0 +1,50 @@
+name: Deploy postman-api to Kubernetes
+
+# Builds the image and rolls it out to the cluster. This exists because
+# there's no local machine in this workflow to run `docker build` on — the
+# build has to happen somewhere, and GitHub Actions' runner is it, same
+# reasoning as the Pages deploy workflow.
+#
+# Does NOT touch k8s/secret.yaml — that's applied once, by hand. See the
+# comment in that file for why.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/postman-api/**'
+      - 'packages/database/**'
+      - 'packages/api-zod/**'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Log in to DigitalOcean Container Registry
+        run: doctl registry login --expiry-seconds 600
+
+      - name: Build and push image
+        run: |
+          IMAGE=registry.digitalocean.com/${{ vars.DO_REGISTRY_NAME }}/postman-api:${{ github.sha }}
+          docker build -t "$IMAGE" -f apps/postman-api/Dockerfile .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Point kubectl at the cluster
+        run: doctl kubernetes cluster kubeconfig save ${{ vars.DO_CLUSTER_NAME }}
+
+      - name: Apply manifests (Deployment + Service only, never the Secret)
+        run: kubectl apply -f apps/postman-api/k8s/deployment.yaml
+
+      - name: Roll out the new image
+        run: kubectl set image deployment/postman-api postman-api="$IMAGE"
+
+      - name: Wait for rollout to finish
+        run: kubectl rollout status deployment/postman-api --timeout=120s
