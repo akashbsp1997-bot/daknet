@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postman-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postman-api
+  template:
+    metadata:
+      labels:
+        app: postman-api
+    spec:
+      containers:
+        - name: postman-api
+          image: postman-api:latest # overwritten on every deploy by `kubectl set image` in CI
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+          envFrom:
+            - secretRef:
+                name: postman-api-secrets
+          # Same /health endpoint the Render deploy already relies on.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postman-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: postman-api
+  ports:
+    - port: 80
+      targetPort: 3000
