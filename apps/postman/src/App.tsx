@@ -5,6 +5,7 @@ import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
 import { initApi } from './lib/api';
+import { getRole } from '@/lib/auth';
 
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { Shell } from './components/layout/Shell';
@@ -106,9 +107,13 @@ function Router() {
       </Route>
 
       <Route path="/">
-        <ProtectedRoute>
-          <div className="min-h-screen flex items-center justify-center">Redirecting...</div>
-        </ProtectedRoute>
+        {getRole() ? (
+          <ProtectedRoute>
+            <div className="min-h-screen flex items-center justify-center">Redirecting...</div>
+          </ProtectedRoute>
+        ) : (
+          <Login />
+        )}
       </Route>
 
       <Route component={NotFound} />
