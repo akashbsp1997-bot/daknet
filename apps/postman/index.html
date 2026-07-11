@@ -21,7 +21,9 @@
   </head>
   <body>
     <div id="root"></div>
-    <!-- TEMPORARY — diagnostic only, remove once the actual error is found -->
+    <!-- Eruda: mobile debug console. Intentionally kept in during active
+         development (no local machine to attach real devtools to) — remove
+         this block before real field operators start using the app. -->
     <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
     <script>eruda.init();</script>
     <script type="module" src="/src/main.tsx"></script>
