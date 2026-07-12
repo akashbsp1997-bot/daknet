@@ -1,0 +1,30 @@
+name: Diagnose DB Schema
+
+# One-off, read-only diagnostic for the "Failed query" error against
+# user_offices seen in production. Checks installed extensions, table
+# existence, and runs the exact failing query to surface the real Postgres
+# error. Safe to run any time — no writes.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: pnpm install --no-frozen-lockfile
+
+      - name: Diagnose schema
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm --filter @workspace/db exec node diagnose-schema.mjs
