@@ -1,0 +1,51 @@
+name: Reset Super Admin
+
+# Manual-only recovery tool for a locked-out super-admin login. Runs
+# packages/database/reset-super-admin.mjs against the real database using
+# DATABASE_URL / SUPER_ADMIN_USERNAME / SUPER_ADMIN_PASSWORD from repo
+# secrets (never typed into this form — this repo is public, and manual
+# workflow_dispatch inputs are visible to anyone, unlike secrets).
+#
+# To use from a phone/browser, no terminal needed:
+#   1. Settings -> Secrets and variables -> Actions -> set/update
+#      SUPER_ADMIN_USERNAME and SUPER_ADMIN_PASSWORD to what you want them
+#      to be (DATABASE_URL should already be set, from db-push.yml).
+#   2. Actions tab -> "Reset Super Admin" -> Run workflow.
+#      Leave "dry_run" checked first to see what it would do; uncheck it
+#      and run again to actually apply.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (show what would happen, change nothing)"
+        type: boolean
+        default: true
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: pnpm install --no-frozen-lockfile
+
+      - name: Reset super admin
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPER_ADMIN_USERNAME: ${{ secrets.SUPER_ADMIN_USERNAME }}
+          SUPER_ADMIN_PASSWORD: ${{ secrets.SUPER_ADMIN_PASSWORD }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            pnpm --filter @workspace/db exec node reset-super-admin.mjs --dry-run
+          else
+            pnpm --filter @workspace/db exec node reset-super-admin.mjs
+          fi
