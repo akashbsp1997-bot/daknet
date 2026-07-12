@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "sync-secrets": "node ./sync-secrets.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "libsodium-wrappers": "^0.7.15",
     "tsx": "catalog:"
   }
 }
