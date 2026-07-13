@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useListBeats, useCreateBeat, useUpdateBeat, useListUsers, useAssignBeat } from "@workspace/api-client-react";
-import { Plus, Loader2, MapPin, Search } from "lucide-react";
+import { Plus, Loader2, MapPin, Search, Pencil, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getListBeatsQueryKey } from "@workspace/api-client-react";
 import { getUser } from '@/lib/auth';
 import { Badge } from "@/components/ui/badge";
+import { ClickableMap, convertGeoJsonToPoints, convertPointsToGeoJson, Polygon } from "@/components/MapComponents";
 
 export default function Beats() {
   const queryClient = useQueryClient();
@@ -22,9 +23,20 @@ export default function Beats() {
   const createBeat = useCreateBeat();
   const updateBeat = useUpdateBeat();
   const assignBeat = useAssignBeat();
-  
+
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({ name: "", operatorId: "" });
+
+  const [boundaryBeatId, setBoundaryBeatId] = useState<string | null>(null);
+  const [polygonPoints, setPolygonPoints] = useState<[number, number][]>([]);
+
+  const boundaryBeat = beats?.find(b => b.id === boundaryBeatId) ?? null;
+
+  useEffect(() => {
+    if (boundaryBeat) {
+      setPolygonPoints(convertGeoJsonToPoints(boundaryBeat.polygonGeoJson));
+    }
+  }, [boundaryBeatId]);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +57,26 @@ export default function Beats() {
     });
   };
 
+  const handleMapClick = (e: any) => {
+    setPolygonPoints(points => [...points, [e.latlng.lat, e.latlng.lng]]);
+  };
+
+  const clearPolygon = () => setPolygonPoints([]);
+
+  const handleSavePolygon = () => {
+    if (!boundaryBeatId) return;
+    const geoJson = convertPointsToGeoJson(polygonPoints);
+    updateBeat.mutate({ id: boundaryBeatId, data: { polygonGeoJson: geoJson ?? undefined } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListBeatsQueryKey({ officeId }) });
+        setBoundaryBeatId(null);
+      }
+    });
+  };
+
+  const mapCenter = polygonPoints.length > 0 ? polygonPoints[0] : [20.5937, 78.9629] as [number, number];
+  const mapZoom = polygonPoints.length > 0 ? 14 : 5;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -52,7 +84,7 @@ export default function Beats() {
           <h2 className="text-2xl font-bold tracking-tight">Delivery Beats</h2>
           <p className="text-muted-foreground">Manage geographical delivery zones.</p>
         </div>
-        
+
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <Button>
@@ -83,7 +115,7 @@ export default function Beats() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <Button type="submit" className="w-full mt-4" disabled={createBeat.isPending}>
                 {createBeat.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Create Beat
@@ -116,7 +148,7 @@ export default function Beats() {
                     {beat.isActive ? "Active" : "Inactive"}
                   </Badge>
                 </div>
-                
+
                 <div className="space-y-3 mt-4 pt-4 border-t">
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground">Assigned Operator</Label>
@@ -132,6 +164,15 @@ export default function Beats() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setBoundaryBeatId(beat.id)}
+                  >
+                    <Pencil className="w-3.5 h-3.5 mr-2" />
+                    {beat.polygonGeoJson ? "Edit Boundary" : "Draw Boundary"}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -143,6 +184,34 @@ export default function Beats() {
           )}
         </div>
       )}
+
+      <Sheet open={!!boundaryBeatId} onOpenChange={(v) => { if (!v) setBoundaryBeatId(null); }}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl flex flex-col">
+          <SheetHeader>
+            <SheetTitle>{boundaryBeat ? `${boundaryBeat.name} — Boundary` : "Boundary"}</SheetTitle>
+          </SheetHeader>
+          <div className="flex items-center gap-2 mt-4">
+            <Button variant="outline" size="sm" onClick={clearPolygon}>
+              <Trash2 className="w-4 h-4 mr-2" /> Clear
+            </Button>
+            <Button size="sm" onClick={handleSavePolygon} disabled={updateBeat.isPending}>
+              {updateBeat.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Save Boundary
+            </Button>
+            <span className="text-xs text-muted-foreground ml-auto">{polygonPoints.length} points</span>
+          </div>
+          <p className="text-xs text-muted-foreground -mt-2">Tap the map to place each corner of this beat's zone.</p>
+          <div className="flex-1 relative bg-muted rounded-md overflow-hidden mt-2 min-h-[400px] z-0">
+            {boundaryBeatId && (
+              <ClickableMap center={mapCenter} zoom={mapZoom} onMapClick={handleMapClick}>
+                {polygonPoints.length > 0 && (
+                  <Polygon positions={polygonPoints} pathOptions={{ color: 'hsl(var(--secondary))', fillColor: 'hsl(var(--secondary))', fillOpacity: 0.25 }} />
+                )}
+              </ClickableMap>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import SuperOffices from './pages/super/offices';
 import SuperOfficeDetail from './pages/super/office-detail';
 import SuperUsers from './pages/super/users';
 import Dashboard from './pages/admin/dashboard';
+import OfficeSettings from './pages/admin/office';
 import Operators from './pages/admin/operators';
 import Beats from './pages/admin/beats';
 import AdminMap from './pages/admin/map';
@@ -56,6 +57,11 @@ function Router() {
       <Route path="/dashboard">
         <ProtectedRoute allowedRoles={["office_admin"]}>
           <Shell><Dashboard /></Shell>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard/office">
+        <ProtectedRoute allowedRoles={["office_admin"]}>
+          <Shell><OfficeSettings /></Shell>
         </ProtectedRoute>
       </Route>
       <Route path="/dashboard/operators">

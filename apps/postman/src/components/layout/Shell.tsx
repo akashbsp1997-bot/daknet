@@ -32,6 +32,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   const adminLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard/office", label: "Office", icon: Building2 },
     { href: "/dashboard/operators", label: "Operators", icon: Users },
     { href: "/dashboard/beats", label: "Beats", icon: MapPin },
     { href: "/dashboard/map", label: "Live Map", icon: MapPin },
