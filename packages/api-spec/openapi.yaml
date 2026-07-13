@@ -1364,6 +1364,13 @@ components:
         phone:
           type: string
           nullable: true
+        locationLat:
+          type: string
+          nullable: true
+          description: Pin marking where the office physically is (distinct from polygonGeoJson, the area it serves)
+        locationLng:
+          type: string
+          nullable: true
         polygonGeoJson:
           type: object
           nullable: true
@@ -1396,6 +1403,10 @@ components:
           type: string
         phone:
           type: string
+        locationLat:
+          type: string
+        locationLng:
+          type: string
         polygonGeoJson:
           type: object
       required: [name, code, address, district, state, pincode]
@@ -1414,6 +1425,10 @@ components:
         pincode:
           type: string
         phone:
+          type: string
+        locationLat:
+          type: string
+        locationLng:
           type: string
         polygonGeoJson:
           type: object

@@ -27,7 +27,9 @@ router.get("/offices", requireAuth, async (req, res): Promise<void> => {
       return {
         id: o.id, name: o.name, code: o.code, address: o.address,
         district: o.district, state: o.state, pincode: o.pincode,
-        phone: o.phone ?? null, polygonGeoJson: o.polygonGeoJson ?? null,
+        phone: o.phone ?? null,
+        locationLat: o.locationLat ?? null, locationLng: o.locationLng ?? null,
+        polygonGeoJson: o.polygonGeoJson ?? null,
         isActive: o.isActive,
         beatCount: beatCount?.count ?? 0,
         operatorCount: opCount?.count ?? 0,
@@ -39,7 +41,7 @@ router.get("/offices", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/offices", requireAuth, requireRole("super_admin"), async (req, res): Promise<void> => {
-  const { name, code, address, district, state, pincode, phone, polygonGeoJson } = req.body;
+  const { name, code, address, district, state, pincode, phone, locationLat, locationLng, polygonGeoJson } = req.body;
   if (!name || !code || !address || !district || !state || !pincode) {
     res.status(400).json({ error: "bad_request", message: "Missing required fields" });
     return;
@@ -47,12 +49,16 @@ router.post("/offices", requireAuth, requireRole("super_admin"), async (req, res
   const [office] = await db.insert(officesTable).values({
     name, code, address, district, state, pincode,
     phone: phone ?? null,
+    locationLat: locationLat ?? null,
+    locationLng: locationLng ?? null,
     polygonGeoJson: polygonGeoJson ?? null,
   }).returning();
   res.status(201).json({
     id: office.id, name: office.name, code: office.code, address: office.address,
     district: office.district, state: office.state, pincode: office.pincode,
-    phone: office.phone ?? null, polygonGeoJson: office.polygonGeoJson ?? null,
+    phone: office.phone ?? null,
+    locationLat: office.locationLat ?? null, locationLng: office.locationLng ?? null,
+    polygonGeoJson: office.polygonGeoJson ?? null,
     isActive: office.isActive, beatCount: 0, operatorCount: 0,
     createdAt: office.createdAt.toISOString(),
   });
@@ -67,7 +73,9 @@ router.get("/offices/:id", requireAuth, async (req, res): Promise<void> => {
   res.json({
     id: office.id, name: office.name, code: office.code, address: office.address,
     district: office.district, state: office.state, pincode: office.pincode,
-    phone: office.phone ?? null, polygonGeoJson: office.polygonGeoJson ?? null,
+    phone: office.phone ?? null,
+    locationLat: office.locationLat ?? null, locationLng: office.locationLng ?? null,
+    polygonGeoJson: office.polygonGeoJson ?? null,
     isActive: office.isActive, beatCount: beatCount?.count ?? 0, operatorCount: opCount?.count ?? 0,
     createdAt: office.createdAt.toISOString(),
   });
@@ -75,7 +83,7 @@ router.get("/offices/:id", requireAuth, async (req, res): Promise<void> => {
 
 router.put("/offices/:id", requireAuth, requireRole("super_admin", "office_admin"), async (req, res): Promise<void> => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const { name, address, district, state, pincode, phone, polygonGeoJson } = req.body;
+  const { name, address, district, state, pincode, phone, locationLat, locationLng, polygonGeoJson } = req.body;
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name;
   if (address !== undefined) updates.address = address;
@@ -83,6 +91,8 @@ router.put("/offices/:id", requireAuth, requireRole("super_admin", "office_admin
   if (state !== undefined) updates.state = state;
   if (pincode !== undefined) updates.pincode = pincode;
   if (phone !== undefined) updates.phone = phone;
+  if (locationLat !== undefined) updates.locationLat = locationLat;
+  if (locationLng !== undefined) updates.locationLng = locationLng;
   if (polygonGeoJson !== undefined) updates.polygonGeoJson = polygonGeoJson;
   const [office] = await db.update(officesTable).set(updates).where(eq(officesTable.id, id)).returning();
   if (!office) { res.status(404).json({ error: "not_found", message: "Office not found" }); return; }
@@ -91,7 +101,9 @@ router.put("/offices/:id", requireAuth, requireRole("super_admin", "office_admin
   res.json({
     id: office.id, name: office.name, code: office.code, address: office.address,
     district: office.district, state: office.state, pincode: office.pincode,
-    phone: office.phone ?? null, polygonGeoJson: office.polygonGeoJson ?? null,
+    phone: office.phone ?? null,
+    locationLat: office.locationLat ?? null, locationLng: office.locationLng ?? null,
+    polygonGeoJson: office.polygonGeoJson ?? null,
     isActive: office.isActive, beatCount: beatCount?.count ?? 0, operatorCount: opCount?.count ?? 0,
     createdAt: office.createdAt.toISOString(),
   });
@@ -105,7 +117,9 @@ router.patch("/offices/:id/status", requireAuth, requireRole("super_admin"), asy
   if (!office) { res.status(404).json({ error: "not_found", message: "Office not found" }); return; }
   res.json({ id: office.id, name: office.name, code: office.code, address: office.address,
     district: office.district, state: office.state, pincode: office.pincode,
-    phone: office.phone ?? null, polygonGeoJson: office.polygonGeoJson ?? null,
+    phone: office.phone ?? null,
+    locationLat: office.locationLat ?? null, locationLng: office.locationLng ?? null,
+    polygonGeoJson: office.polygonGeoJson ?? null,
     isActive: office.isActive, beatCount: 0, operatorCount: 0, createdAt: office.createdAt.toISOString() });
 });
 

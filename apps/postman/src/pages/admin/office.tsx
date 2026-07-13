@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ClickableMap, convertGeoJsonToPoints, convertPointsToGeoJson, Polygon } from "@/components/MapComponents";
+import { ClickableMap, convertGeoJsonToPoints, convertPointsToGeoJson, Polygon, Marker } from "@/components/MapComponents";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetOfficeQueryKey } from "@workspace/api-client-react";
 import { getUser } from '@/lib/auth';
+
+const INDIA_CENTER: [number, number] = [20.5937, 78.9629];
 
 export default function OfficeSettings() {
   const currentUser = getUser();
@@ -23,6 +25,7 @@ export default function OfficeSettings() {
   });
 
   const [polygonPoints, setPolygonPoints] = useState<[number, number][]>([]);
+  const [locationPoint, setLocationPoint] = useState<[number, number] | null>(null);
 
   useEffect(() => {
     if (office) {
@@ -36,6 +39,9 @@ export default function OfficeSettings() {
       });
       if (office.polygonGeoJson) {
         setPolygonPoints(convertGeoJsonToPoints(office.polygonGeoJson));
+      }
+      if (office.locationLat && office.locationLng) {
+        setLocationPoint([parseFloat(office.locationLat), parseFloat(office.locationLng)]);
       }
     }
   }, [office]);
@@ -78,10 +84,31 @@ export default function OfficeSettings() {
     });
   };
 
+  const handleLocationMapClick = (e: any) => {
+    setLocationPoint([e.latlng.lat, e.latlng.lng]);
+  };
+
+  const clearLocation = () => setLocationPoint(null);
+
+  const handleSaveLocation = () => {
+    if (!locationPoint) return;
+    updateOffice.mutate({
+      id: officeId,
+      data: { locationLat: String(locationPoint[0]), locationLng: String(locationPoint[1]) }
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetOfficeQueryKey(officeId) });
+      }
+    });
+  };
+
+  const locationCenter = locationPoint ?? INDIA_CENTER;
+  const locationZoom = locationPoint ? 15 : 5;
+
   const center = polygonPoints.length > 0
     ? polygonPoints[0]
-    : [20.5937, 78.9629] as [number, number];
-  const zoom = polygonPoints.length > 0 ? 13 : 5;
+    : locationPoint ?? INDIA_CENTER;
+  const zoom = polygonPoints.length > 0 ? 13 : locationPoint ? 13 : 5;
 
   return (
     <div className="space-y-6">
@@ -137,35 +164,62 @@ export default function OfficeSettings() {
           </CardContent>
         </Card>
 
-        <Card className="col-span-1 lg:col-span-2 overflow-hidden flex flex-col h-[600px]">
-          <CardHeader className="flex flex-row items-center justify-between pb-4 bg-muted/30">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-primary" />
-                Office Area
-              </CardTitle>
-              <CardDescription>Click on the map to draw your office's operational boundary.</CardDescription>
+        <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
+          <Card className="overflow-hidden flex flex-col h-[350px]">
+            <CardHeader className="flex flex-row items-center justify-between pb-4 bg-muted/30">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-primary" />
+                  Office Location
+                </CardTitle>
+                <CardDescription>Tap the map to pin exactly where the office is.</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={clearLocation}>
+                  <Trash2 className="w-4 h-4 mr-2" /> Clear
+                </Button>
+                <Button size="sm" onClick={handleSaveLocation} disabled={updateOffice.isPending || !locationPoint}>
+                  <Save className="w-4 h-4 mr-2" /> Save Location
+                </Button>
+              </div>
+            </CardHeader>
+            <div className="flex-1 relative bg-muted z-0">
+              <ClickableMap center={locationCenter} zoom={locationZoom} onMapClick={handleLocationMapClick}>
+                {locationPoint && <Marker position={locationPoint} />}
+              </ClickableMap>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={clearPolygon}>
-                <Trash2 className="w-4 h-4 mr-2" /> Clear
-              </Button>
-              <Button size="sm" onClick={handleSavePolygon} disabled={updateOffice.isPending}>
-                <Save className="w-4 h-4 mr-2" /> Save Boundary
-              </Button>
+          </Card>
+
+          <Card className="overflow-hidden flex flex-col h-[350px]">
+            <CardHeader className="flex flex-row items-center justify-between pb-4 bg-muted/30">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-primary" />
+                  Office Area
+                </CardTitle>
+                <CardDescription>Click on the map to draw your office's operational boundary.</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={clearPolygon}>
+                  <Trash2 className="w-4 h-4 mr-2" /> Clear
+                </Button>
+                <Button size="sm" onClick={handleSavePolygon} disabled={updateOffice.isPending}>
+                  <Save className="w-4 h-4 mr-2" /> Save Boundary
+                </Button>
+              </div>
+            </CardHeader>
+            <div className="flex-1 relative bg-muted z-0">
+              <ClickableMap center={center} zoom={zoom} onMapClick={handleMapClick}>
+                {polygonPoints.length > 0 && (
+                  <Polygon positions={polygonPoints} pathOptions={{ color: 'hsl(var(--primary))', fillColor: 'hsl(var(--primary))', fillOpacity: 0.2 }} />
+                )}
+              </ClickableMap>
+              <div className="absolute bottom-4 left-4 bg-background/90 backdrop-blur text-xs p-2 rounded-md border shadow-sm z-[1000] pointer-events-none">
+                {polygonPoints.length} points
+              </div>
             </div>
-          </CardHeader>
-          <div className="flex-1 relative bg-muted z-0">
-            <ClickableMap center={center} zoom={zoom} onMapClick={handleMapClick}>
-              {polygonPoints.length > 0 && (
-                <Polygon positions={polygonPoints} pathOptions={{ color: 'hsl(var(--primary))', fillColor: 'hsl(var(--primary))', fillOpacity: 0.2 }} />
-              )}
-            </ClickableMap>
-            <div className="absolute bottom-4 left-4 bg-background/90 backdrop-blur text-xs p-2 rounded-md border shadow-sm z-[1000] pointer-events-none">
-              {polygonPoints.length} points
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       </div>
     </div>
   );

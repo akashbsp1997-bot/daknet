@@ -12,6 +12,10 @@ export const officesTable = pgTable("offices", {
   state: text("state").notNull(),
   pincode: text("pincode").notNull(),
   phone: text("phone"),
+  // Single pin marking where the office physically is — distinct from the
+  // polygon boundary below (which is the area it serves, not a point).
+  locationLat: text("location_lat"),
+  locationLng: text("location_lng"),
   polygonGeoJson: json("polygon_geo_json"),
   geom: geometry("geom", { type: "polygon", srid: 4326 }), // see beats.ts — same additive PostGIS pattern
   isActive: boolean("is_active").notNull().default(true),
