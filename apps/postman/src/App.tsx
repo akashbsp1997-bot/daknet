@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, Router as WouterRouter } from 'wouter';
+import { Route, Switch, Router as WouterRouter, Redirect } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
 import { initApi } from './lib/api';
 import { getRole } from '@/lib/auth';
@@ -107,13 +107,13 @@ function Router() {
       </Route>
 
       <Route path="/">
-        {getRole() ? (
-          <ProtectedRoute>
-            <div className="min-h-screen flex items-center justify-center">Redirecting...</div>
-          </ProtectedRoute>
-        ) : (
-          <Login />
-        )}
+        {(() => {
+          const role = getRole();
+          if (!role) return <Login />;
+          if (role === "super_admin") return <Redirect to="/super/offices" />;
+          if (role === "office_admin") return <Redirect to="/dashboard" />;
+          return <Redirect to="/field" />;
+        })()}
       </Route>
 
       <Route component={NotFound} />
