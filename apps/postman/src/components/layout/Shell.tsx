@@ -2,12 +2,13 @@ import React from "react";
 import { useLocation, Link } from "wouter";
 import { getRole, clearTokens, getUser } from '@/lib/auth';
 import { useLogout } from "@workspace/api-client-react";
-import { 
-  Building2, Users, MapPin, FileBox, LayoutDashboard, 
-  LogOut, Package, ListChecks, Menu
+import {
+  Building2, Users, MapPin, FileBox, LayoutDashboard,
+  LogOut, Package, ListChecks, Menu, CloudOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useOfflineQueue } from "@/hooks/use-offline-queue";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const role = getRole();
@@ -15,6 +16,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
   const logout = useLogout();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const { pendingCount, isOnline } = useOfflineQueue();
 
   const handleLogout = () => {
     logout.mutate(undefined, {
@@ -89,6 +91,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <div className="flex flex-col min-h-[100dvh] bg-gray-50 dark:bg-background">
         <header className="bg-primary text-primary-foreground h-14 flex items-center px-4 shadow-md z-10 shrink-0">
           <h1 className="text-lg font-bold">Dak Ops | Field</h1>
+          {(!isOnline || pendingCount > 0) && (
+            <div className="ml-3 flex items-center gap-1.5 text-xs font-medium bg-primary-foreground/15 px-2 py-1 rounded-full">
+              <CloudOff className="w-3.5 h-3.5" />
+              {pendingCount > 0 ? `${pendingCount} pending` : "Offline"}
+            </div>
+          )}
           <div className="ml-auto">
             <Button variant="ghost" size="icon" onClick={handleLogout} className="text-primary-foreground hover:bg-primary-foreground/20">
               <LogOut className="w-5 h-5" />

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useGetOperatorDashboard, useUpdateArticle, useScanArticle } from "@workspace/api-client-react";
+import { useGetOperatorDashboard, scanArticle } from "@workspace/api-client-react";
 import { Package, ScanLine, Loader2, CheckCircle2, XCircle, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,17 +11,17 @@ import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetOperatorDashboardQueryKey } from "@workspace/api-client-react";
 import { getUser } from '@/lib/auth';
+import { useToast } from "@/hooks/use-toast";
+import { enqueueArticleUpdate } from "@/lib/offline-queue";
 
 export default function FieldArticles() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const operatorId = getUser()?.id || "";
 
-  const { data: dashboard, isLoading } = useGetOperatorDashboard({ operatorId }, {
-    query: { enabled: !!operatorId, queryKey: ["operatorDashboard", operatorId] }
+  const { data: dashboard, isLoading } = useGetOperatorDashboard({
+    query: { enabled: !!operatorId }
   });
-
-  const scanArticle = useScanArticle();
-  const updateArticle = useUpdateArticle();
 
   const [scanMode, setScanMode] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
@@ -29,43 +29,51 @@ export default function FieldArticles() {
   const [deliveryReason, setDeliveryReason] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleScanResult = (barcode: string) => {
+  const handleScanResult = async (barcode: string) => {
     setScanMode(false);
-    scanArticle.mutate({ data: { barcode, operatorId } }, {
-      onSuccess: (article) => {
-        setSelectedArticle(article);
-      },
-      onError: () => {
-        // Fallback to local search
-        const found = dashboard?.articles.find(a => a.barcode === barcode);
-        if (found) setSelectedArticle(found);
-      }
-    });
+    try {
+      const article = await scanArticle(barcode);
+      setSelectedArticle(article);
+    } catch {
+      // Offline or lookup failed — fall back to the already-loaded list.
+      const found = dashboard?.articles.find((a: any) => a.barcode === barcode);
+      if (found) setSelectedArticle(found);
+    }
   };
 
-  const submitStatus = () => {
+  const getCurrentPosition = (): Promise<GeolocationPosition | null> =>
+    new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve(null); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve(pos),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    });
+
+  const submitStatus = async () => {
     if (!selectedArticle) return;
     setIsProcessing(true);
-    
-    // GPS placeholder (in real app, use geolocation API)
-    const gpsLat = 20.0; 
-    const gpsLng = 78.0;
 
-    updateArticle.mutate({ 
-      id: selectedArticle.id, 
-      data: { 
-        status: deliveryStatus as any, 
-        deliveryReason: deliveryStatus !== 'delivered' ? deliveryReason : undefined,
-        gpsLat, gpsLng
-      } 
-    }, {
-      onSuccess: () => {
-        setIsProcessing(false);
-        setSelectedArticle(null);
-        queryClient.invalidateQueries({ queryKey: getGetOperatorDashboardQueryKey({ operatorId }) });
-      },
-      onError: () => setIsProcessing(false)
+    const position = await getCurrentPosition();
+
+    // Written to the on-device queue first, regardless of connectivity —
+    // it flushes to the server automatically once online, so a delivery
+    // confirmation can never be silently lost to a bad signal.
+    await enqueueArticleUpdate(selectedArticle.id, {
+      status: deliveryStatus as any,
+      deliveryReason: deliveryStatus !== 'delivered' ? deliveryReason : undefined,
+      gpsLat: position?.coords.latitude,
+      gpsLng: position?.coords.longitude,
     });
+
+    setIsProcessing(false);
+    setSelectedArticle(null);
+    toast({
+      title: "Status updated",
+      description: navigator.onLine ? undefined : "No connection — will sync automatically once you're back online.",
+    });
+    queryClient.invalidateQueries({ queryKey: getGetOperatorDashboardQueryKey() });
   };
 
   const getStatusIcon = (status: string) => {

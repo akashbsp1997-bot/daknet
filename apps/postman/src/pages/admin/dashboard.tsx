@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { useGetAdminDashboard, useListOffices } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { getUser } from '@/lib/auth';
-import { 
-  Users, Package, CheckCircle2, AlertCircle, RefreshCw, 
-  MapPin, Loader2, ArrowUpRight,
-  Badge
+import {
+  Users, Package, CheckCircle2, AlertCircle, RefreshCw,
+  MapPin, Loader2, ArrowUpRight
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 

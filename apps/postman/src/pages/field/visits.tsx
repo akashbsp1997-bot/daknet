@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { useCreateVisit } from "@workspace/api-client-react";
 import { MapPin, Loader2, Building2, UserCircle, Briefcase, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,10 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getUser } from '@/lib/auth';
+import { enqueueVisit } from "@/lib/offline-queue";
 
 export default function FieldVisits() {
   const { toast } = useToast();
-  const createVisit = useCreateVisit();
   const user = getUser();
 
   const [visitType, setVisitType] = useState<string>("delivery");
@@ -18,6 +17,7 @@ export default function FieldVisits() {
   const [contactNumber, setContactNumber] = useState("");
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
   const [locating, setLocating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     setLocating(true);
@@ -35,31 +35,35 @@ export default function FieldVisits() {
     }
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!location) {
       toast({ title: "Location required", description: "GPS location is required to record a visit.", variant: "destructive" });
       return;
     }
 
-    createVisit.mutate({
-      data: {
-        visitType: visitType as any,
-        gpsLat: location.lat,
-        gpsLng: location.lng,
-        timestamp: new Date().toISOString(),
-        notes,
-        contactNumber,
-        beatId: user?.beatId || undefined
-      }
-    }, {
-      onSuccess: () => {
-        toast({ title: "Visit recorded successfully" });
-        setNotes("");
-        setContactNumber("");
-        setVisitType("delivery");
-      }
+    setSubmitting(true);
+    // Written to the on-device queue first, regardless of connectivity —
+    // it flushes to the server automatically once online, so this can
+    // never silently lose a field visit to a bad signal.
+    await enqueueVisit({
+      visitType: visitType as any,
+      gpsLat: location.lat,
+      gpsLng: location.lng,
+      timestamp: new Date().toISOString(),
+      notes,
+      contactNumber,
+      beatId: user?.beatId || undefined
     });
+    setSubmitting(false);
+
+    toast({
+      title: "Visit recorded",
+      description: navigator.onLine ? undefined : "No connection — will sync automatically once you're back online.",
+    });
+    setNotes("");
+    setContactNumber("");
+    setVisitType("delivery");
   };
 
   const types = [
@@ -132,9 +136,9 @@ export default function FieldVisits() {
           type="submit" 
           size="lg" 
           className="w-full h-14 font-bold text-base mt-4 shadow-md"
-          disabled={createVisit.isPending || !location || locating}
+          disabled={submitting || !location || locating}
         >
-          {createVisit.isPending ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+          {submitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
           Record Visit
         </Button>
       </form>
