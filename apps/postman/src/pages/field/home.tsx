@@ -1,17 +1,17 @@
 import React, { useState } from "react";
-import { useGetOperatorDashboard, useListArticles } from "@workspace/api-client-react";
+import { useGetOperatorDashboard } from "@workspace/api-client-react";
 import { Package, MapPin, CheckCircle2, ChevronRight, ScanLine, Loader2, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { getUser } from '@/lib/auth';
-import { Button } from "react-day-picker";
 
 export default function FieldHome() {
   const user = getUser();
   const operatorId = user?.id;
 
-  const { data: dashboard, isLoading } = useGetOperatorDashboard({ operatorId: operatorId || "" }, {
-    query: { enabled: !!operatorId, queryKey: ["operatorDashboard", operatorId] }
+  const { data: dashboard, isLoading } = useGetOperatorDashboard({
+    query: { enabled: !!operatorId }
   });
 
   if (isLoading || !dashboard) {
