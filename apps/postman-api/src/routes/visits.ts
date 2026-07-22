@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, visitsTable, userOfficesTable, visitPhotosTable, addressesTable, encodeDigipin } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { uploadPhoto, getPhotoUrl } from "../lib/storage";
+import { refreshAddressLocation } from "../lib/address-sync";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -62,6 +63,14 @@ router.post("/visits", requireAuth, async (req, res): Promise<void> => {
     notes: notes ?? null, contactNumber: contactNumber ?? null,
     isSynced: true,
   }).returning();
+
+  // A completed delivery at a known address is a live, physically-confirmed
+  // GPS reading — more trustworthy than however the address was originally
+  // entered, so fold it back in automatically.
+  if (visitType === "delivery" && addressId) {
+    await refreshAddressLocation(addressId, Number(gpsLat), Number(gpsLng));
+  }
+
   res.status(201).json(formatVisit(visit));
 });
 

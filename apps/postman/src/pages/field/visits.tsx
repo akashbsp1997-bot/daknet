@@ -7,14 +7,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getUser } from '@/lib/auth';
 import { enqueueVisit } from "@/lib/offline-queue";
+import { AddressPicker, type AddressPickerValue } from "@/components/AddressPicker";
 
 export default function FieldVisits() {
   const { toast } = useToast();
   const user = getUser();
+  const officeId = user?.officeIds?.[0] || "";
 
   const [visitType, setVisitType] = useState<string>("delivery");
   const [notes, setNotes] = useState("");
   const [contactNumber, setContactNumber] = useState("");
+  const [linkedAddress, setLinkedAddress] = useState<AddressPickerValue | null>(null);
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -53,7 +56,8 @@ export default function FieldVisits() {
       timestamp: new Date().toISOString(),
       notes,
       contactNumber,
-      beatId: user?.beatId || undefined
+      beatId: user?.beatId || undefined,
+      addressId: linkedAddress?.id || undefined,
     });
     setSubmitting(false);
 
@@ -63,6 +67,7 @@ export default function FieldVisits() {
     });
     setNotes("");
     setContactNumber("");
+    setLinkedAddress(null);
     setVisitType("delivery");
   };
 
@@ -97,6 +102,18 @@ export default function FieldVisits() {
             ))}
           </div>
         </div>
+
+        {visitType === "delivery" && (
+          <div className="space-y-3">
+            <Label>Link to Address (Optional)</Label>
+            <AddressPicker officeId={officeId} value={linkedAddress} onChange={setLinkedAddress} />
+            {linkedAddress && (
+              <p className="text-xs text-muted-foreground">
+                This delivery's GPS will update {linkedAddress.name}'s location on file.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="space-y-3">
           <Label>Contact Number (Optional)</Label>
